@@ -8,6 +8,7 @@ SERVICES = {
     "SpringBoot Provesi API": "https://micro-pedidos-iua0.onrender.com/actuator/health",
     "FastAPI Inventario": "https://micro-inventario.onrender.com/health",
 }
+
 CHECK_INTERVAL = 10  # segundos entre chequeos
 FAIL_LIMIT = 5       # fallas consecutivas antes de alerta
 
@@ -17,6 +18,7 @@ SMTP_PORT = 587
 FROM_EMAIL = "santafegod@gmail.com"
 FROM_PASSWORD = "dirbjrglphlljnjs"
 TO_EMAIL = "juanesteban.guzmanangel@gmail.com"
+
 
 def send_email_alert(subject, message):
     msg = MIMEText(message)
@@ -29,30 +31,40 @@ def send_email_alert(subject, message):
         server.login(FROM_EMAIL, FROM_PASSWORD)
         server.sendmail(FROM_EMAIL, TO_EMAIL, msg.as_string())
 
-def check_health():
+
+def check_service(name, url):
+    """Devuelve True si está vivo, False si falló."""
     try:
-        r = requests.get(HEALTH_URL, timeout=5)
+        r = requests.get(url, timeout=5)
         return r.status_code == 200
-    except Exception:
+    except:
         return False
 
+
 def main():
-    fails = 0
+    fails = {name: 0 for name in SERVICES}  # fallas por servicio
+
     while True:
-        healthy = check_health()
-        if healthy:
-            print(" Servicio saludable.")
-            fails = 0
-        else:
-            fails += 1
-            print(f" Falla detectada #{fails}")
-            if fails >= FAIL_LIMIT:
-                send_email_alert(
-                    "ALERTA: Servicio inactivo",
-                    f"El servicio {HEALTH_URL} ha fallado {fails} veces seguidas."
-                )
-                fails = 0  # reinicia después de alertar
+        for name, url in SERVICES.items():
+            healthy = check_service(name, url)
+
+            if healthy:
+                print(f" {name} SALUDABLE")
+                fails[name] = 0
+            else:
+                fails[name] += 1
+                print(f" {name} FALLA #{fails[name]}")
+
+                if fails[name] >= FAIL_LIMIT:
+                    send_email_alert(
+                        f"ALERTA: {name} está caído",
+                        f"El servicio {name} ha fallado {fails[name]} veces seguidas.\nURL: {url}"
+                    )
+                    fails[name] = 0
+
         time.sleep(CHECK_INTERVAL)
+
 
 if __name__ == "__main__":
     main()
+
