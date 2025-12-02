@@ -3,25 +3,13 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 
-# ============================
-# CONFIGURACIÓN DE SERVICIOS
-# ============================
-
 SERVICES = {
-    "SpringBoot Provesi API":
-        "https://micro-pedidos-iua0.onrender.com/actuator/health",
-
-    "FastAPI Inventario":
-        "https://micro-inventario.onrender.com/health",
+    "SpringBoot Provesi API": "https://micro-pedidos-iua0.onrender.com/actuator/health",
+    "FastAPI Inventario": "https://micro-inventario.onrender.com/health",
 }
 
-CHECK_INTERVAL = 10    # segundos entre chequeos
-FAIL_LIMIT = 5         # fallas antes de enviar alerta
-
-
-# ============================
-# CONFIG SMTP
-# ============================
+CHECK_INTERVAL = 10  
+FAIL_LIMIT = 5       
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
@@ -30,77 +18,55 @@ FROM_PASSWORD = "dirbjrglphlljnjs"
 TO_EMAIL = "juanesteban.guzmanangel@gmail.com"
 
 
-# ============================
-# ENVÍO DE ALERTAS
-# ============================
-
-def send_email_alert(service, fails):
-    subject = f"ALERTA: {service} está fallando"
-    message = f"El servicio '{service}' ha fallado {fails} veces seguidas."
-
+def send_email_alert(subject, message):
     msg = MIMEText(message)
     msg["Subject"] = subject
     msg["From"] = FROM_EMAIL
     msg["To"] = TO_EMAIL
 
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(FROM_EMAIL, FROM_PASSWORD)
-            server.sendmail(FROM_EMAIL, TO_EMAIL, msg.as_string())
-
-        print(f"📧 ALERTA ENVIADA: {service}")
-
-    except Exception as e:
-        print(f"❌ ERROR ENVIANDO CORREO: {e}")
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        server.starttls()
+        server.login(FROM_EMAIL, FROM_PASSWORD)
+        server.sendmail(FROM_EMAIL, TO_EMAIL, msg.as_string())
 
 
-# ============================
-# HEALTH CHECK REAL
-# ============================
-
-def check_health(url):
+def is_healthy(url):
     try:
         r = requests.get(url, timeout=5)
         return r.status_code == 200
-    except Exception as e:
-        print(f"⚠️ Error al conectar con {url}: {e}")
+    except Exception:
         return False
 
 
-# ============================
-# LOOP PRINCIPAL
-# ============================
-
 def main():
-    print("🚀 Iniciando Health Broker...")
-    print("⏳ Esperando 20 segundos para que Render habilite red...")
-    time.sleep(20)
-
-    fails = {name: 0 for name in SERVICES}
+    fail_count = 0
 
     while True:
-        print("\n====================")
-        print("🔍 Chequeando servicios...")
-        print("====================")
+        all_ok = True
 
         for name, url in SERVICES.items():
-            healthy = check_health(url)
+            healthy = is_healthy(url)
 
-            if healthy:
-                print(f"🟢 {name} OK")
-                fails[name] = 0
-
+            if not healthy:
+                print(f"❌ {name} FALLÓ → {url}")
+                all_ok = False
             else:
-                fails[name] += 1
-                print(f"🔴 {name} FALLÓ #{fails[name]}")
+                print(f"✅ {name} OK")
 
-                if fails[name] >= FAIL_LIMIT:
-                    send_email_alert(name, fails[name])
-                    fails[name] = 0  # reset después de alertar
+        if all_ok:
+            fail_count = 0
+        else:
+            fail_count += 1
+            if fail_count >= FAIL_LIMIT:
+                send_email_alert(
+                    "ALERTA: Uno o más servicios están caídos",
+                    f"Health Check detectó {fail_count} fallos consecutivos."
+                )
+                fail_count = 0
 
         time.sleep(CHECK_INTERVAL)
 
 
 if __name__ == "__main__":
+    print("🚀 Iniciando Broker de Health Checks...")
     main()
