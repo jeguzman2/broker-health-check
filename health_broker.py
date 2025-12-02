@@ -11,11 +11,12 @@ SERVICES = {
 CHECK_INTERVAL = 10  
 FAIL_LIMIT = 5       
 
-SMTP_SERVER = "smtp-mail.outlook.com"
+FROM_EMAIL = "juanesteban.guzmanangel@gmail.com"
+FROM_PASSWORD = "qgmvdowajqchxtzz"
+SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-FROM_EMAIL = "provesi.alertas@outlook.com"
-FROM_PASSWORD = "pibas123"
-TO_EMAIL = "juanesteban.guzmanangel@gmail.com"   
+TO_EMAIL = "juanesteban.guzmanangel@gmail.com"
+
 
 
 
